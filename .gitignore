@@ -1,0 +1,32 @@
+# Rust
+target/
+Cargo.lock
+
+# Runtime data
+netwatch-data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
