@@ -4,6 +4,7 @@ pub mod cli;
 pub mod config;
 pub mod config_file;
 pub mod database;
+pub mod discovery;
 pub mod error;
 pub mod models;
 pub mod storage;
