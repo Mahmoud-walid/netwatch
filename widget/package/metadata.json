@@ -1,0 +1,19 @@
+{
+  "KPlugin": {
+    "Id": "com.mahmoudts.netwatch",
+    "Name": "NetWatch",
+    "Description": "Professional Network Monitoring and Traffic Accounting",
+    "Icon": "network-workgroup",
+    "Authors": [
+      {
+        "Name": "Mahmoud",
+        "Email": "mahmoud@example.com"
+      }
+    ],
+    "Version": "0.1.0"
+  },
+  "X-Plasma-API": "declarativeappletscript",
+  "X-Plasma-MainScript": "ui/main.qml",
+  "KPackageStructure": "Plasma/Applet",
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
