@@ -27,8 +27,9 @@ impl DatabaseManager {
         Self::open_connection(&self.db_path)
     }
 
-    pub fn connect(db_path: &Path) -> Result<Connection, DatabaseError> {
-        Self::open_connection(db_path)
+    pub fn connect(storage_path: &Path) -> Result<Connection, DatabaseError> {
+        let db_path = storage_path.join(DB_FILE_NAME);
+        Self::open_connection(&db_path)
     }
 
     fn open_connection(db_path: &Path) -> Result<Connection, DatabaseError> {
@@ -92,6 +93,7 @@ impl DatabaseManager {
                 last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             ",
+            // Version 2
             "
             ALTER TABLE devices ADD COLUMN last_rx_bytes INTEGER DEFAULT 0;
             ALTER TABLE devices ADD COLUMN last_tx_bytes INTEGER DEFAULT 0;
@@ -104,6 +106,10 @@ impl DatabaseManager {
                 tx_bytes INTEGER DEFAULT 0,
                 PRIMARY KEY (device_id, date)
             );
+            ",
+            // Version 3
+            "
+            ALTER TABLE devices ADD COLUMN vendor TEXT;
             ",
         ];
 
