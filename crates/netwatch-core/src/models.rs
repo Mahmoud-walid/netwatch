@@ -14,6 +14,7 @@ pub struct Device {
     pub ip_address: Option<String>,
     pub hostname: Option<String>,
     pub display_name: Option<String>,
+    pub vendor: Option<String>,
     pub user_id: Option<i64>,
     pub is_online: bool,
     pub first_seen: String,
