@@ -20,6 +20,7 @@ impl DeviceRepository {
             last_seen: row.get(8)?,
             last_rx_bytes: rx.unwrap_or(0) as u64,
             last_tx_bytes: tx.unwrap_or(0) as u64,
+            vendor: row.get(11).ok(),
         })
     }
 
@@ -28,16 +29,18 @@ impl DeviceRepository {
         mac_address: &str,
         ip_address: Option<&str>,
         hostname: Option<&str>,
+        vendor: Option<&str>,
     ) -> SqliteResult<Device> {
         conn.execute(
-            "INSERT INTO devices (mac_address, ip_address, hostname, is_online, last_seen)
-             VALUES (?1, ?2, ?3, 1, CURRENT_TIMESTAMP)
+            "INSERT INTO devices (mac_address, ip_address, hostname, vendor, is_online, last_seen)
+             VALUES (?1, ?2, ?3, ?4, 1, CURRENT_TIMESTAMP)
              ON CONFLICT(mac_address) DO UPDATE SET
-                ip_address = excluded.ip_address,
-                hostname = excluded.hostname,
+                ip_address = COALESCE(excluded.ip_address, ip_address),
+                hostname = COALESCE(excluded.hostname, hostname),
+                vendor = COALESCE(excluded.vendor, vendor),
                 is_online = 1,
                 last_seen = CURRENT_TIMESTAMP",
-            params![mac_address, ip_address, hostname],
+            params![mac_address, ip_address, hostname, vendor],
         )?;
 
         Self::get_by_mac(conn, mac_address)
@@ -45,7 +48,7 @@ impl DeviceRepository {
 
     pub fn get_by_mac(conn: &Connection, mac_address: &str) -> SqliteResult<Device> {
         conn.query_row(
-            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes 
+            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes, vendor 
              FROM devices WHERE mac_address = ?1",
             params![mac_address],
             Self::row_to_device,
@@ -54,7 +57,7 @@ impl DeviceRepository {
 
     pub fn get_by_id(conn: &Connection, id: i64) -> SqliteResult<Device> {
         conn.query_row(
-            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes 
+            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes, vendor 
              FROM devices WHERE id = ?1",
             params![id],
             Self::row_to_device,
@@ -63,8 +66,8 @@ impl DeviceRepository {
 
     pub fn get_all(conn: &Connection) -> SqliteResult<Vec<Device>> {
         let mut stmt = conn.prepare(
-            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes 
-             FROM devices ORDER BY last_seen DESC",
+            "SELECT id, mac_address, ip_address, hostname, display_name, user_id, is_online, first_seen, last_seen, last_rx_bytes, last_tx_bytes, vendor 
+             FROM devices ORDER BY is_online DESC, last_seen DESC",
         )?;
 
         let iter = stmt.query_map([], Self::row_to_device)?;
@@ -119,6 +122,7 @@ mod tests {
             "AA:BB:CC:DD:EE:FF",
             Some("192.168.1.10"),
             Some("MyPhone"),
+            None,
         )
         .unwrap();
 
@@ -136,6 +140,7 @@ mod tests {
             "AA:BB:CC:DD:EE:FF",
             Some("192.168.1.10"),
             Some("MyPhone"),
+            None,
         )
         .unwrap();
 
@@ -144,6 +149,7 @@ mod tests {
             "AA:BB:CC:DD:EE:FF",
             Some("192.168.1.15"),
             Some("MyPhone2"),
+            None,
         )
         .unwrap();
 
@@ -157,7 +163,8 @@ mod tests {
     fn assigns_user_to_device() {
         let conn = setup_test_db();
         let user = UserRepository::create(&conn, "Mahmoud").unwrap();
-        let device = DeviceRepository::upsert(&conn, "AA:BB:CC:DD:EE:FF", None, None).unwrap();
+        let device =
+            DeviceRepository::upsert(&conn, "AA:BB:CC:DD:EE:FF", None, None, None).unwrap();
 
         DeviceRepository::assign_user(&conn, device.id, Some(user.id)).unwrap();
 
