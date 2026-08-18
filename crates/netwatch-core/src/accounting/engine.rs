@@ -2,10 +2,11 @@ use crate::database::{accounting::AccountingRepository, devices::DeviceRepositor
 use crate::error::NetWatchError;
 use crate::traffic::{DeviceTraffic, TrafficCounters};
 use chrono::Local;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Instant;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct LiveBandwidth {
     pub rx_bps: u64,
     pub tx_bps: u64,
@@ -41,7 +42,7 @@ impl AccountingEngine {
         let mut live_bandwidth = HashMap::new();
 
         for dt in traffics {
-            let device = DeviceRepository::upsert(&tx, &dt.mac_address, None, None)
+            let device = DeviceRepository::upsert(&tx, &dt.mac_address, None, None, None)
                 .map_err(crate::error::DatabaseError::Query)?;
 
             let previous = TrafficCounters {
