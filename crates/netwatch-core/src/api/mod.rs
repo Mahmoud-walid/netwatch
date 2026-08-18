@@ -1,12 +1,16 @@
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{
+        Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::broadcast;
 
 use crate::database::{
     DatabaseManager, accounting::AccountingRepository, devices::DeviceRepository,
@@ -15,7 +19,8 @@ use crate::database::{
 use crate::models::{Device, User};
 
 pub struct ApiState {
-    pub db_path: PathBuf,
+    pub storage_path: PathBuf,
+    pub live_tx: broadcast::Sender<String>,
 }
 
 #[derive(Serialize)]
@@ -56,8 +61,14 @@ pub struct UsageResponse {
     pub tx_bytes: u64,
 }
 
-pub async fn start_api_server(db_path: PathBuf) -> Result<(), std::io::Error> {
-    let state = Arc::new(ApiState { db_path });
+pub async fn start_api_server(
+    storage_path: PathBuf,
+    live_tx: broadcast::Sender<String>,
+) -> Result<(), std::io::Error> {
+    let state = Arc::new(ApiState {
+        storage_path,
+        live_tx,
+    });
 
     let app = Router::new()
         .route("/api/v1/status", get(get_status))
@@ -66,6 +77,7 @@ pub async fn start_api_server(db_path: PathBuf) -> Result<(), std::io::Error> {
         .route("/api/v1/users", get(get_users).post(create_user))
         .route("/api/v1/usage/device/:id", get(get_device_usage))
         .route("/api/v1/usage/user/:id", get(get_user_usage))
+        .route("/api/v1/live", get(live_ws_handler))
         .with_state(state);
 
     let listener = TcpListener::bind("127.0.0.1:3030").await?;
@@ -74,9 +86,9 @@ pub async fn start_api_server(db_path: PathBuf) -> Result<(), std::io::Error> {
     axum::serve(listener, app).await
 }
 
-// دالة مساعدة لفتح اتصال سريع بقاعدة البيانات للـ API
 fn get_db(state: &ApiState) -> rusqlite::Connection {
-    DatabaseManager::connect(&state.db_path).expect("Failed to connect to database for API request")
+    DatabaseManager::connect(&state.storage_path)
+        .expect("Failed to connect to database for API request")
 }
 
 async fn get_status() -> Json<StatusResponse> {
@@ -149,4 +161,23 @@ async fn get_user_usage(
     .unwrap_or((0, 0));
 
     Json(UsageResponse { rx_bytes, tx_bytes })
+}
+
+// WebSocket Handlers
+
+async fn live_ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<ApiState>>,
+) -> axum::response::Response {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(mut socket: WebSocket, state: Arc<ApiState>) {
+    let mut rx = state.live_tx.subscribe();
+
+    while let Ok(msg) = rx.recv().await {
+        if socket.send(Message::Text(msg)).await.is_err() {
+            break;
+        }
+    }
 }
