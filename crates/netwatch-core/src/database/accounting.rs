@@ -79,6 +79,13 @@ impl AccountingRepository {
             Ok((rx.unwrap_or(0) as u64, tx.unwrap_or(0) as u64))
         })
     }
+
+    pub fn cleanup_old_records(conn: &Connection, days_to_keep: u64) -> SqliteResult<usize> {
+        conn.execute(
+            "DELETE FROM device_usage_daily WHERE date <= date('now', ?1)",
+            params![format!("-{} days", days_to_keep)],
+        )
+    }
 }
 
 #[cfg(test)]
@@ -90,7 +97,7 @@ mod tests {
     #[test]
     fn records_daily_usage_and_updates_counters() {
         let conn = setup_test_db();
-        let device = DeviceRepository::upsert(&conn, "AA:BB:CC", None, None).unwrap();
+        let device = DeviceRepository::upsert(&conn, "AA:BB:CC", None, None, None).unwrap();
 
         AccountingRepository::record_usage(&conn, device.id, "2026-08-17", 500, 100, 1500, 300)
             .unwrap();
